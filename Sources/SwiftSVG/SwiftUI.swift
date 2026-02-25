@@ -23,13 +23,7 @@ public struct SVGView: View {
             if #available(macOS 12.0, iOS 15.0, *) {
                 CanvasView(svg: svg)
             } else {
-                #if canImport(UIKit) || canImport(AppKit)
-                GeometryReader { geometry in
-                    Image(svg: svg, size: geometry.size)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                }
-                #endif
+                ImageView(svg: svg)
             }
         }
     }
@@ -43,8 +37,37 @@ internal extension SVGView {
         let svg: SVGData
         
         var body: some View {
-            Canvas { context, size in
-                context.render(svg, size: size)
+            if let intrinsicSize = svg.intrinsicSize {
+                Canvas { context, size in
+                    context.render(svg, size: size)
+                }
+                .frame(width: intrinsicSize.width, height: intrinsicSize.height)
+            } else {
+                Canvas { context, size in
+                    context.render(svg, size: size)
+                }
+            }
+        }
+    }
+}
+
+internal extension SVGView {
+    
+    struct ImageView: View {
+        
+        let svg: SVGData
+        
+        var body: some View {
+            Group {
+                if let size = svg.intrinsicSize {
+                    Image(svg: svg, size: size)
+                } else {
+                    GeometryReader { geometry in
+                        Image(svg: svg, size: geometry.size)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    }
+                }
             }
         }
     }
@@ -57,6 +80,37 @@ extension GraphicsContext: SVGRenderer {
         self.withCGContext { context in
             context.render(svg, size: size)
         }
+    }
+}
+
+#Preview {
+    VStack {
+        if #available(iOS 15.0, *) {
+            SVGView.CanvasView(svg: SVGData("""
+        <svg width="100" height="200" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100" height="200" fill="red"/>
+        </svg>
+        """)!)
+            
+            SVGView.CanvasView(svg: SVGData("""
+        <svg xmlns="http://www.w3.org/2000/svg">
+            <rect width="50" height="50" fill="red"/>
+        </svg>
+        """)!)
+            .frame(width: 50, height: 50)
+        }
+        
+        SVGView.ImageView(svg: SVGData("""
+    <svg width="100" height="200" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="200" fill="red"/>
+    </svg>
+    """)!)
+        
+        SVGView.ImageView(svg: SVGData("""
+    <svg xmlns="http://www.w3.org/2000/svg">
+        <rect width="50" height="50" fill="red"/>
+    </svg>
+    """)!)
     }
 }
 
