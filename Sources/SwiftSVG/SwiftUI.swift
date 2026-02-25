@@ -20,16 +20,22 @@ public struct SVGView: View {
     
     public var body: some View {
         Group {
-            if #available(macOS 12.0, *) {
+            if #available(macOS 12.0, iOS 15.0, *) {
                 CanvasView(svg: svg)
             } else {
-                
+                #if canImport(UIKit) || canImport(AppKit)
+                GeometryReader { geometry in
+                    Image(svg: svg, size: geometry.size)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                }
+                #endif
             }
         }
     }
 }
 
-@available(macOS 12.0, *)
+@available(macOS 12.0, iOS 15.0, *)
 internal extension SVGView {
     
     struct CanvasView: View {
@@ -44,7 +50,7 @@ internal extension SVGView {
     }
 }
 
-@available(macOS 12.0, *)
+@available(macOS 12.0, iOS 15.0, *)
 extension GraphicsContext: SVGRenderer {
     
     public func render(_ svg: SVGData, size: CGSize) {
