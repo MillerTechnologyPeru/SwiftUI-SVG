@@ -1,0 +1,43 @@
+// swift-tools-version: 6.2
+import PackageDescription
+
+let package = Package(
+    name: "SwiftSVG",
+    platforms: [
+        .iOS(.v13),
+        .macOS(.v10_15),
+        .tvOS(.v13),
+        .watchOS(.v6)
+    ],
+    products: [
+        // Products define the executables and libraries a package produces, making them visible to other packages.
+        .library(
+            name: "SwiftSVG",
+            targets: ["SwiftSVG"]
+        ),
+    ],
+    dependencies: [
+        .package(
+            url: "https://github.com/MillerTechnologyPeru/svgnative-swift.git",
+            branch: "feature/swift-6"
+        )
+    ],
+    targets: [
+        .target(
+            name: "SwiftSVG",
+            dependencies: [
+                .product(
+                    name: "svgnative",
+                    package: "svgnative-swift"
+                )
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx)
+            ]
+        ),
+        .testTarget(
+            name: "SwiftSVGTests",
+            dependencies: ["SwiftSVG"]
+        ),
+    ]
+)
