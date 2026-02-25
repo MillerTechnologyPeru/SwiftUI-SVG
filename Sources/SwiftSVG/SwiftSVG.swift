@@ -7,10 +7,7 @@
 
 import Foundation
 import CoreGraphics
-
-#if canImport(svgnative)
-import svgnative
-#endif
+import SVGNative
 
 /// SVG Data
 public struct SVGData: Equatable, Hashable, Sendable {
@@ -27,12 +24,7 @@ public struct SVGData: Equatable, Hashable, Sendable {
     
     /// Check if the string has proper SVG prefix or tag
     internal static func isValidSVG(_ string: String) -> Bool {
-        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Check for common SVG prefixes
-        return trimmed.hasPrefix("<?xml") || // XML declaration
-               trimmed.hasPrefix("<svg") ||  // SVG root element
-               trimmed.contains("<svg")      // SVG tag somewhere in the content
+        SVGNative(string) != nil
     }
 }
 
@@ -48,25 +40,10 @@ public extension SVGData {
     /// Get the intrinsic size defined in the SVG data
     /// - Returns: The intrinsic size if available, or nil if the SVG doesn't define dimensions
     var intrinsicSize: CGSize? {
-        #if canImport(svgnative)
-        guard let context = svg_native_create(SVG_RENDERER_UNKNOWN, rawValue) else {
+        guard let document = SVGNative(rawValue) else {
             return nil
         }
-        defer {
-            svg_native_destroy(context)
-        }
-        let width = svg_native_canvas_width(context)
-        let height = svg_native_canvas_height(context)
-        
-        // Check if dimensions are valid (non-zero and not NaN)
-        guard width > 0 && height > 0 && !width.isNaN && !height.isNaN else {
-            return nil
-        }
-        
-        return CGSize(width: CGFloat(width), height: CGFloat(height))
-        #else
-        return nil
-        #endif
+        return document.intrinsicSize.flatMap { CGSize(width: CGFloat($0.width), height: CGFloat($0.height)) }
     }
 }
 
