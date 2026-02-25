@@ -8,20 +8,16 @@
 #if canImport(CoreGraphics)
 import Foundation
 import CoreGraphics
-import svgnative
+import SVGNative
 
 extension CGContext: SVGRenderer {
     
     public func render(_ svg: SVGData, size: CGSize) {
-        let svgString = svg.rawValue
-        guard let context = svg_native_create(SVG_RENDERER_CG, svgString) else {
+        guard let svgDocument = SVGNative(svg.rawValue) else {
             return
         }
-        defer {
-            svg_native_destroy(context)
-        }
-        svg_native_set_renderer(context, Unmanaged.passUnretained(self).toOpaque())
-        svg_native_render_size(context, Float(size.width), Float(size.height))
+        svgDocument.setRenderer(self)
+        svgDocument.render((Float(size.width), Float(size.height)))
     }
 }
 
