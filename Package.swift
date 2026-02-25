@@ -30,9 +30,6 @@ let package = Package(
                     name: "svgnative",
                     package: "svgnative-swift"
                 )
-            ],
-            swiftSettings: [
-                .interoperabilityMode(.Cxx)
             ]
         ),
         .testTarget(
