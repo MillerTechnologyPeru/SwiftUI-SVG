@@ -10,7 +10,6 @@ let package = Package(
         .watchOS(.v6)
     ],
     products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "SwiftSVG",
             targets: ["SwiftSVG"]
@@ -30,6 +29,9 @@ let package = Package(
                     name: "svgnative",
                     package: "svgnative-swift"
                 )
+            ],
+            swiftSettings: [
+                .interoperabilityMode(.Cxx)
             ]
         ),
         .testTarget(
