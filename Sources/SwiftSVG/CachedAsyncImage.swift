@@ -375,7 +375,7 @@ private extension CachedAsyncImage {
         if let nsImage = NSImage(data: data) {
             return Image(nsImage: nsImage)
         } else if let svg = SVGData(data: data) {
-            return Image(svg: svg)
+            return Image(svg: svg, size: svg.intrinsicSize ?? CGSize(width: 100, height: 100))
         } else {
             throw AsyncImage<Content>.LoadingError()
         }
@@ -383,7 +383,7 @@ private extension CachedAsyncImage {
         if let uiImage = UIImage(data: data, scale: scale) {
             return Image(uiImage: uiImage)
         } else if let svg = SVGData(data: data) {
-            return Image(svg: svg)
+            return Image(svg: svg, size: svg.intrinsicSize ?? CGSize(width: 100, height: 100))
         } else {
             throw AsyncImage<Content>.LoadingError()
         }
@@ -410,4 +410,11 @@ private extension URLSession {
         let (data, response) = try await data(for: request, delegate: controller)
         return (data, response, controller.metrics!)
     }
+}
+
+// MARK: - Preview
+
+@available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
+#Preview {
+    CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/adobe.svg")!)
 }
