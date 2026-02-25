@@ -416,8 +416,37 @@ private extension URLSession {
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
 #Preview {
-    VStack(spacing: 20) {
-        CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/adobe.svg")!)
+    VStack(spacing: 16) {
+        CachedAsyncImage(url: URL(string: "https://p3.aprimocdn.net/bp0/d034fd02-4688-4e16-b641-b39a01440cdb/ihop.svg_Original%20file.svg")!) { phase in
+            switch phase {
+            case .empty:
+                EmptyView()
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 150, height: 150)
+            case .failure(let error):
+                EmptyView()
+            @unknown default:
+                EmptyView()
+            }
+        }
+        CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/adobe.svg")!) { phase in
+            switch phase {
+            case .empty:
+                EmptyView()
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 150, height: 150)
+            case .failure(let error):
+                EmptyView()
+            @unknown default:
+                EmptyView()
+            }
+        }
         CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/debian.svg")!)
         CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/mozilla.svg")!)
         CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/ruby.svg")!)
