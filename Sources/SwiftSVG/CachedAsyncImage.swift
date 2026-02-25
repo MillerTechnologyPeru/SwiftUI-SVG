@@ -374,12 +374,16 @@ private extension CachedAsyncImage {
 #if os(macOS)
         if let nsImage = NSImage(data: data) {
             return Image(nsImage: nsImage)
+        } else if let svg = SVGData(data: data) {
+            return Image(svg: svg)
         } else {
             throw AsyncImage<Content>.LoadingError()
         }
 #else
         if let uiImage = UIImage(data: data, scale: scale) {
             return Image(uiImage: uiImage)
+        } else if let svg = SVGData(data: data) {
+            return Image(svg: svg)
         } else {
             throw AsyncImage<Content>.LoadingError()
         }
