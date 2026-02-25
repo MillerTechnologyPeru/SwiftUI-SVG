@@ -13,7 +13,8 @@ import SVGNative
 extension CGContext: SVGRenderer {
     
     public func render(_ svg: SVGData, size: CGSize) {
-        guard let svgDocument = SVGNative(svg.rawValue) else {
+        let svgString = svg.resolveSVGStyles()
+        guard let svgDocument = SVGNative(svgString) else {
             return
         }
         svgDocument.setRenderer(self)
