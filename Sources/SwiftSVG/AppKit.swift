@@ -9,7 +9,6 @@
 import Foundation
 import AppKit
 import CoreGraphics
-import svgnative
 
 extension NSGraphicsContext: SVGRenderer {
     
