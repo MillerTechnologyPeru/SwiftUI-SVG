@@ -8,6 +8,10 @@
 import Foundation
 import CoreGraphics
 
+#if canImport(svgnative)
+import svgnative
+#endif
+
 /// SVG Data
 public struct SVGData: Equatable, Hashable, Sendable {
     
@@ -39,6 +43,30 @@ public extension SVGData {
             return nil
         }
         self.init(svgString)
+    }
+    
+    /// Get the intrinsic size defined in the SVG data
+    /// - Returns: The intrinsic size if available, or nil if the SVG doesn't define dimensions
+    var intrinsicSize: CGSize? {
+        #if canImport(svgnative)
+        guard let context = svg_native_create(SVG_RENDERER_UNKNOWN, rawValue) else {
+            return nil
+        }
+        defer {
+            svg_native_destroy(context)
+        }
+        let width = svg_native_canvas_width(context)
+        let height = svg_native_canvas_height(context)
+        
+        // Check if dimensions are valid (non-zero and not NaN)
+        guard width > 0 && height > 0 && !width.isNaN && !height.isNaN else {
+            return nil
+        }
+        
+        return CGSize(width: CGFloat(width), height: CGFloat(height))
+        #else
+        return nil
+        #endif
     }
 }
 
