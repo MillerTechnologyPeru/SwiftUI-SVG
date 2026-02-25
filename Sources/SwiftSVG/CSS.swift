@@ -17,17 +17,24 @@ internal extension SVGData {
         
         // Extract all CSS class definitions from <style> blocks
         let classStyles = extractCSSClasses(from: rawValue)
-        guard !classStyles.isEmpty else { return rawValue }
+        guard !classStyles.isEmpty else { 
+            return rawValue 
+        }
         
         // Apply CSS classes to elements with class attributes
         var result = rawValue
         
-        // Find all elements with class attributes
-        let classAttrPattern = /class="([^"]+)"/
+        // Find all elements with class attributes - match the opening tag
+        let classAttrPattern = /<([a-zA-Z][a-zA-Z0-9]*)\s+([^>]*?)class="([^"]+)"([^>]*?)>/
         
-        for match in rawValue.matches(of: classAttrPattern) {
-            let fullMatch = String(rawValue[match.range])
-            let classNames = String(match.1).split(separator: " ").map(String.init)
+        // Process matches in reverse order to maintain correct positions
+        let matches = Array(result.matches(of: classAttrPattern).reversed())
+        
+        for match in matches {
+            let tagName = String(match.1)
+            let beforeClass = String(match.2)
+            let classNames = String(match.3).split(separator: " ").map(String.init)
+            let afterClass = String(match.4)
             
             // Accumulate all styles from all classes
             var combinedStyles: [String: String] = [:]
@@ -38,14 +45,17 @@ internal extension SVGData {
             }
             
             if !combinedStyles.isEmpty {
-                // Convert styles to inline style attribute
-                let styleString = combinedStyles
-                    .map { "\($0.key):\($0.value)" }
-                    .joined(separator: ";")
+                // Convert CSS properties to direct SVG attributes (not style attribute)
+                // SVGNative doesn't support style attributes, but does support direct attributes
+                let attributeString = combinedStyles
+                    .map { "\($0.key)=\"\($0.value)\"" }
+                    .joined(separator: " ")
                 
-                // Replace class attribute with style attribute
-                let replacement = #"style="\#(styleString)""#
-                result = result.replacingOccurrences(of: fullMatch, with: replacement)
+                // Build the replacement tag with direct attributes instead of class
+                let replacement = "<\(tagName) \(beforeClass)\(attributeString)\(afterClass)>"
+                
+                // Replace this specific match
+                result.replaceSubrange(match.range, with: replacement)
             }
         }
         
@@ -99,7 +109,19 @@ internal extension SVGData {
     private func removeStyleBlocks(from svg: String) -> String {
         // Remove <style>...</style> blocks
         var result = svg
-        let styleBlockPattern = /<style[^>]*>.*?<\/style>/
+        // Use .dotMatchesNewlines to match across newlines
+        let styleBlockPattern = Regex {
+            "<style"
+            ZeroOrMore(.reluctant) {
+                CharacterClass.anyOf(">").inverted
+            }
+            ">"
+            ZeroOrMore(.reluctant) {
+                CharacterClass.any
+            }
+            "</style>"
+        }
+        .dotMatchesNewlines()
         
         while let match = result.firstMatch(of: styleBlockPattern) {
             result.removeSubrange(match.range)
@@ -142,6 +164,12 @@ import SwiftUI
         c0,0.7-0.5,1.2-1.1,1.2c-0.5,0-0.7-0.1-1-0.5l-2.5-3.2h-2v2.5c0,0.7-0.6,1.2-1.2,1.2c-0.7,0-1.2-0.5-1.2-1.2V5.8z M653.9,10.4
         L653.9,10.4c0-5.1-3.9-9.2-9.1-9.2c-5.2,0-9.2,4.1-9.2,9.2v0.1c0,5.1,3.9,9.2,9.1,9.2C649.9,19.6,653.9,15.4,653.9,10.4 M634.4,10.4
         L634.4,10.4C634.4,4.7,639,0,644.8,0c5.8,0,10.3,4.7,10.3,10.3v0.1c0,5.6-4.6,10.4-10.4,10.4C638.9,20.7,634.4,16.1,634.4,10.4"/>
+    </svg>
+    """)!).frame(width: 150, height: 150)
+    
+    SVGView(SVGData("""
+    <svg viewBox='0 0 105 93' xmlns='http://www.w3.org/2000/svg'>
+    <path d='M66,0h39v93zM38,0h-38v93zM52,35l25,58h-16l-8-18h-18z' fill='#ED1C24'/>
     </svg>
     """)!).frame(width: 150, height: 150)
 }
