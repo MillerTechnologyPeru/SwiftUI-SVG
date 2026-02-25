@@ -26,17 +26,14 @@ let package = Package(
             name: "SwiftSVG",
             dependencies: [
                 .product(
-                    name: "svgnative",
+                    name: "SVGNative",
                     package: "svgnative-swift"
                 )
             ],
-            swiftSettings: [
-                .interoperabilityMode(.Cxx)
-            ]
         ),
         .testTarget(
             name: "SwiftSVGTests",
             dependencies: ["SwiftSVG"]
-        ),
+        )
     ]
 )
