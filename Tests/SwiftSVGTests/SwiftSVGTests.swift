@@ -1,10 +1,6 @@
 import Testing
 @testable import SwiftSVG
 
-@Test func example() async throws {
-    // Write your test here and use APIs like `#expect(...)` to check expected conditions.
-}
-
 @Test func testIntrinsicSize() async throws {
     // Test SVG with explicit width and height
     let svgWithSize = """
