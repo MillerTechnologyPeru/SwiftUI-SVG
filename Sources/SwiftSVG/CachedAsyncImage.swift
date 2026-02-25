@@ -416,5 +416,11 @@ private extension URLSession {
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
 #Preview {
-    CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/adobe.svg")!)
+    VStack(spacing: 20) {
+        CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/adobe.svg")!)
+        CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/debian.svg")!)
+        CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/mozilla.svg")!)
+        CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/ruby.svg")!)
+        CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/wikimedia.svg")!)
+    }
 }
