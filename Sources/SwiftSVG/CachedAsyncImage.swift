@@ -306,12 +306,8 @@ public struct CachedAsyncImage<Content>: View where Content: View {
         self.content = content
         
         self._phase = State(wrappedValue: .empty)
-        do {
-            if let urlRequest = urlRequest, let image = try cachedImage(from: urlRequest, cache: urlCache) {
-                self._phase = State(wrappedValue: .success(image))
-            }
-        } catch {
-            self._phase = State(wrappedValue: .failure(error))
+        if let urlRequest, let image = ImageCache.image(forKey: urlRequest) {
+            self._phase = State(wrappedValue: .success(image))
         }
     }
     
@@ -341,20 +337,80 @@ public struct CachedAsyncImage<Content>: View where Content: View {
     }
 }
 
-// MARK: - LoadingError
-
-@available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
-private extension AsyncImage {
-    
-    struct LoadingError: Error {
-    }
-}
-
 // MARK: - Helpers
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
-private extension CachedAsyncImage {
-    private func remoteImage(from request: URLRequest, session: URLSession) async throws -> (Image, URLSessionTaskMetrics) {
+public extension CachedAsyncImage {
+    
+    @MainActor
+    static var defaultSize: CGSize {
+        get {
+            CachedAsyncImageCache.defaultSize
+        } set {
+            CachedAsyncImageCache.defaultSize = newValue
+        }
+    }
+}
+
+internal enum CachedAsyncImageCache {
+    
+    #if os(macOS)
+    typealias Image = NSImage
+    #else
+    typealias Image = UIImage
+    #endif
+    
+    @MainActor
+    private static var imageCache = NSCache<NSURLRequest, Image>()
+    
+    @MainActor
+    static var defaultSize = CGSize(width: 100, height: 100)
+    
+    @MainActor
+    static func image(forKey key: URLRequest) -> SwiftUI.Image? {
+        guard let cachedImage = imageCache.object(forKey: key as NSURLRequest) else {
+            return nil
+        }
+        #if os(macOS)
+        return SwiftUI.Image(nsImage: cachedImage)
+        #else
+        return SwiftUI.Image(uiImage: cachedImage)
+        #endif
+    }
+    
+    @MainActor
+    static func setImage(_ image: Self.Image, for key: URLRequest) {
+        imageCache.setObject(image, forKey: key as NSURLRequest)
+    }
+    
+    static func createImage(from data: Data, scale: CGFloat = 1.0) async throws -> Self.Image {
+        let defaultSize = await self.defaultSize
+#if os(macOS)
+        if let nsImage = NSImage(data: data) {
+            return nsImage
+        } else if let svg = SVGData(data: data) {
+            return NSImage.svg(svg, size: svg.intrinsicSize ?? defaultSize)
+        } else {
+            throw CocoaError(.coderReadCorrupt)
+        }
+#else
+        if let uiImage = UIImage(data: data, scale: scale) {
+            return uiImage
+        } else if let svg = SVGData(data: data) {
+            return UIImage.svg(svg, size: svg.intrinsicSize ?? defaultSize)
+        } else {
+            throw CocoaError(.coderReadCorrupt)
+        }
+#endif
+    }
+}
+
+@available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
+extension CachedAsyncImage {
+    
+    typealias ImageCache = CachedAsyncImageCache
+    
+    func remoteImage(from request: URLRequest, session: URLSession) async throws -> (Image, URLSessionTaskMetrics) {
         let (data, _, metrics) = try await session.data(for: request)
         if metrics.redirectCount > 0, let lastResponse = metrics.transactionMetrics.last?.response {
             let requests = metrics.transactionMetrics.map { $0.request }
@@ -362,33 +418,33 @@ private extension CachedAsyncImage {
             let lastCachedResponse = CachedURLResponse(response: lastResponse, data: data)
             session.configuration.urlCache!.storeCachedResponse(lastCachedResponse, for: request)
         }
-        return (try image(from: data), metrics)
+        return (try await image(from: data, cacheKey: request), metrics)
     }
     
-    private func cachedImage(from request: URLRequest, cache: URLCache) throws -> Image? {
+    func cachedImage(from request: URLRequest, cache: URLCache) async throws -> Image? {
+        if let image = ImageCache.image(forKey: request) {
+            return image
+        }
         guard let cachedResponse = cache.cachedResponse(for: request) else { return nil }
-        return try image(from: cachedResponse.data)
+        return try await image(from: cachedResponse.data, cacheKey: request)
     }
     
-    private func image(from data: Data) throws -> Image {
-#if os(macOS)
-        if let nsImage = NSImage(data: data) {
-            return Image(nsImage: nsImage)
-        } else if let svg = SVGData(data: data) {
-            return Image(svg: svg, size: svg.intrinsicSize ?? CGSize(width: 100, height: 100))
-        } else {
-            throw AsyncImage<Content>.LoadingError()
-        }
-#else
-        if let uiImage = UIImage(data: data, scale: scale) {
-            return Image(uiImage: uiImage)
-        } else if let svg = SVGData(data: data) {
-            return Image(svg: svg, size: svg.intrinsicSize ?? CGSize(width: 100, height: 100))
-        } else {
-            throw AsyncImage<Content>.LoadingError()
-        }
-#endif
+    @MainActor
+    func image(from data: Data, cacheKey: URLRequest) async throws -> Image {
+        let scale = self.scale
+        let image = try await Task.detached(name: "Create image from data") {
+            try await ImageCache.createImage(from: data, scale: scale)
+        }.value
+        // store in cache
+        ImageCache.setImage(image, for: cacheKey)
+        // return image
+        #if os(macOS)
+        return SwiftUI.Image(nsImage: image)
+        #else
+        return SwiftUI.Image(uiImage: image)
+        #endif
     }
+    
 }
 
 // MARK: - AsyncImageURLSession
@@ -416,40 +472,57 @@ private extension URLSession {
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
 #Preview {
-    VStack(spacing: 16) {
-        CachedAsyncImage(url: URL(string: "https://p3.aprimocdn.net/bp0/d034fd02-4688-4e16-b641-b39a01440cdb/ihop.svg_Original%20file.svg")!) { phase in
-            switch phase {
-            case .empty:
-                EmptyView()
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 150, height: 150)
-            case .failure(let error):
-                EmptyView()
-            @unknown default:
-                EmptyView()
+    ScrollView {
+        VStack(spacing: 16) {
+            CachedAsyncImage(url: URL(string: "https://p3.aprimocdn.net/bp0/39520685-4191-48cb-a20d-b39400550994/fuddruckers_logo.svg_Original%20file.svg")!) { phase in
+                switch phase {
+                case .empty:
+                    EmptyView()
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 150, height: 150)
+                case .failure(let error):
+                    Text("Error: \(error.localizedDescription)")
+                @unknown default:
+                    EmptyView()
+                }
             }
-        }
-        CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/adobe.svg")!) { phase in
-            switch phase {
-            case .empty:
-                EmptyView()
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 150, height: 150)
-            case .failure(let error):
-                EmptyView()
-            @unknown default:
-                EmptyView()
+            CachedAsyncImage(url: URL(string: "https://p3.aprimocdn.net/bp0/d034fd02-4688-4e16-b641-b39a01440cdb/ihop.svg_Original%20file.svg")!) { phase in
+                switch phase {
+                case .empty:
+                    EmptyView()
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 150, height: 150)
+                case .failure(let error):
+                    Text("Error: \(error.localizedDescription)")
+                @unknown default:
+                    EmptyView()
+                }
             }
+            CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/adobe.svg")!) { phase in
+                switch phase {
+                case .empty:
+                    EmptyView()
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 150, height: 150)
+                case .failure(let error):
+                    Text("Error: \(error.localizedDescription)")
+                @unknown default:
+                    Text(verbatim: "\(phase)")
+                }
+            }
+            CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/debian.svg")!)
+            CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/mozilla.svg")!)
+            CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/ruby.svg")!)
+            CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/wikimedia.svg")!)
         }
-        CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/debian.svg")!)
-        CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/mozilla.svg")!)
-        CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/ruby.svg")!)
-        CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/wikimedia.svg")!)
     }
 }
