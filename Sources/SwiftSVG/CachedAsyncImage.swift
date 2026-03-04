@@ -457,7 +457,7 @@ extension CachedAsyncImage {
     @MainActor
     func image(from data: Data, cacheKey: URLRequest) async throws -> Image {
         let scale = self.scale
-        let image = try await Task.detached(name: "Create image from data") {
+        let image = try await Task.detached(name: "Create image from data", priority: .medium) {
             try await ImageCache.createImage(from: data, scale: scale)
         }.value
         // store in cache
@@ -503,7 +503,7 @@ private extension URLSession {
             CachedAsyncImage(url: URL(string: "https://p3.aprimocdn.net/bp0/39520685-4191-48cb-a20d-b39400550994/fuddruckers_logo.svg_Original%20file.svg")!) { phase in
                 switch phase {
                 case .empty:
-                    EmptyView()
+                    ProgressView()
                 case .success(let image):
                     image
                         .resizable()
@@ -518,7 +518,7 @@ private extension URLSession {
             CachedAsyncImage(url: URL(string: "https://p3.aprimocdn.net/bp0/d034fd02-4688-4e16-b641-b39a01440cdb/ihop.svg_Original%20file.svg")!) { phase in
                 switch phase {
                 case .empty:
-                    EmptyView()
+                    ProgressView()
                 case .success(let image):
                     image
                         .resizable()
@@ -533,7 +533,7 @@ private extension URLSession {
             CachedAsyncImage(url: URL(string: "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/adobe.svg")!) { phase in
                 switch phase {
                 case .empty:
-                    EmptyView()
+                    ProgressView()
                 case .success(let image):
                     image
                         .resizable()
