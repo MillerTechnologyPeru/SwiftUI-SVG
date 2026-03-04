@@ -305,9 +305,10 @@ public struct CachedAsyncImage<Content>: View where Content: View {
         self.transaction = transaction
         self.content = content
         
-        self._phase = State(wrappedValue: .empty)
         if let urlRequest, let image = ImageCache.image(forKey: urlRequest) {
             self._phase = State(wrappedValue: .success(image))
+        } else {
+            self._phase = State(wrappedValue: .empty)
         }
     }
     
@@ -350,6 +351,24 @@ public extension CachedAsyncImage {
             CachedAsyncImageCache.defaultSize = newValue
         }
     }
+    
+    @MainActor
+    static var countLimit: UInt {
+        get {
+            UInt(CachedAsyncImageCache.imageCache.countLimit)
+        } set {
+            CachedAsyncImageCache.imageCache.countLimit = Int(newValue)
+        }
+    }
+    
+    @MainActor
+    static var memoryLimit: UInt {
+        get {
+            UInt(CachedAsyncImageCache.imageCache.totalCostLimit)
+        } set {
+            CachedAsyncImageCache.imageCache.totalCostLimit = Int(newValue)
+        }
+    }
 }
 
 internal enum CachedAsyncImageCache {
@@ -361,7 +380,13 @@ internal enum CachedAsyncImageCache {
     #endif
     
     @MainActor
-    private static var imageCache = NSCache<NSURLRequest, Image>()
+    static var imageCache: NSCache<NSURLRequest, Image> = {
+        let cache = NSCache<NSURLRequest, Image>()
+        cache.name = "SwiftSVG.CachedAsyncImage.Cache"
+        cache.countLimit = 100
+        cache.totalCostLimit = 1024 * 1024 * 100
+        return cache
+    }()
     
     @MainActor
     static var defaultSize = CGSize(width: 100, height: 100)
@@ -379,8 +404,8 @@ internal enum CachedAsyncImageCache {
     }
     
     @MainActor
-    static func setImage(_ image: Self.Image, for key: URLRequest) {
-        imageCache.setObject(image, forKey: key as NSURLRequest)
+    static func setImage(_ image: Self.Image, cost: UInt, for key: URLRequest) {
+        imageCache.setObject(image, forKey: key as NSURLRequest, cost: Int(cost))
     }
     
     static func createImage(from data: Data, scale: CGFloat = 1.0) async throws -> Self.Image {
@@ -436,7 +461,8 @@ extension CachedAsyncImage {
             try await ImageCache.createImage(from: data, scale: scale)
         }.value
         // store in cache
-        ImageCache.setImage(image, for: cacheKey)
+        let cost = UInt(data.count)
+        ImageCache.setImage(image, cost: cost, for: cacheKey)
         // return image
         #if os(macOS)
         return SwiftUI.Image(nsImage: image)
